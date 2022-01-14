@@ -68,3 +68,8 @@ If the vehicle's engine compartment doesn't function then the instance will auto
  ```
  
  ---
+
+ ## ToDo
+ * Allow controls to be customised
+ * Allow setting of vehicle attributes / mods
+ * Allow custom offsets / rotations for cameras
