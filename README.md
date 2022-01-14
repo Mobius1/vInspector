@@ -21,11 +21,25 @@ client_scripts {
  Simply pass the model name of the vehicle you want to spawn and the coords (as a `vector4` type) to the constructor:
  ```lua
  local myInspector = Inspector:Create({
-     model = 'adder',
-     coords = vector4(-791.61, -217.96, 36.40, 90.00)
+    model = 'adder',
+    coords = vector4(-791.61, -217.96, 36.40, 90.00),
  })
  ```
  
+ ---
+
+ ## Options
+
+ ```lua
+ local myInspector = Inspector:Create({
+    model = 'adder',
+    coords = vector4(-791.61, -217.96, 36.40, 90.00),
+    hasRearEngine = true,
+    engineCompartmentIndex = 5,
+    primaryColor = { r = 255, g = 255, b = 255 }
+ })
+ ```
+
  ---
  
 ## Controls
@@ -43,7 +57,9 @@ client_scripts {
  
 The player is able to look around the cockpit while in `'cockpit'` view
 
-Note: For the `'engine'` view there is list of rear/mid-engined vehicles included. If you use custom cars with rear/mid engines then you'll need to add the `hash` to the `RearEnginedVehicles` table so that the camera will focus on it correctly.
+Note: For the `'engine'` view there is list of rear/mid-engined vehicles included. If you use custom cars with rear/mid engines then you'll need to set the `hasRearEngine` option to `true` so the camera will focus on it correctly.
+
+Some custom vehicles with rear / mid engines have the rear compartment door index incorrectly set to `4` (the bonnet) - if this is the case, then you need to set the `engineCompartmentIndex` to `4` otherwise the default index of `5` (the boot) will be used.
 
 If the vehicle's engine compartment doesn't function then the instance will automatically remove the option for the `'engine'` view.
 
