@@ -73,3 +73,4 @@ If the vehicle's engine compartment doesn't function then the instance will auto
  * Allow controls to be customised
  * Allow setting of vehicle attributes / mods
  * Allow custom offsets / rotations for cameras
+ * Some custom vehicles are badly made and the bounding boxes are off center which can cause the front / rear cameras to be misaligned - need to find a way of fixing this. Possibly use bones for alignment.
