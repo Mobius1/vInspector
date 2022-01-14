@@ -23,24 +23,14 @@ client_scripts {
  local myInspector = Inspector:Create({
     model = 'adder',
     coords = vector4(-791.61, -217.96, 36.40, 90.00),
+    hasRearEngine = true,
+    engineCompartmentIndex = 5,
+    primaryColor = { r = 255, g = 255, b = 255 }    
  })
  ```
  
  ---
 
- ## Options
-
- ```lua
- local myInspector = Inspector:Create({
-    model = 'adder',
-    coords = vector4(-791.61, -217.96, 36.40, 90.00),
-    hasRearEngine = true,
-    engineCompartmentIndex = 5,
-    primaryColor = { r = 255, g = 255, b = 255 }
- })
- ```
-
- ---
  
 ## Controls
  * `F` - Switches to `'front'` view
