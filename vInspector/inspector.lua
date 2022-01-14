@@ -1,5 +1,5 @@
-
-BackEngineVehicles = {
+-- List of rear / mid-engined vehicles
+RearEnginedVehicles = {
     [`ninef`] = true,
     [`adder`] = true,
     [`vagner`] = true,
@@ -38,22 +38,32 @@ BackEngineVehicles = {
     [`gp1`] = true,
     [`autarch`] = true,
     [`tyrant`] = true,
-    [`count5`] = true,
-    [`fxxk`] = true,
-    [`gtr96`] = 'flipped',
 }
+
+local function mergeTables(t1, t2)
+    for k,v in pairs(t2) do
+        if type(v) == "table" then
+            if type(t1[k] or false) == "table" then
+                mergeTables(t1[k] or {}, t2[k] or {})
+            else
+                t1[k] = v
+            end
+        else
+            t1[k] = v
+        end
+    end
+    return t1
+end
 
 Inspector = {}
 Inspector.__index = Inspector
 
-function Inspector:Create(model, coords)
+function Inspector:Create(options)
     local obj = {}
 
     setmetatable(obj, Inspector)
 
     local player = PlayerPedId()
-    obj.model = model
-    obj.coords = coords
     obj.playerCoords = GetEntityCoords(player)
     obj.playerHeading = GetEntityHeading(player)
         
@@ -78,6 +88,18 @@ function Inspector:Create(model, coords)
     obj.KillThread = false
     obj.callbacks = {}
     obj.views = { 'main', 'front', 'rear', 'side', 'wheel', 'engine', 'cockpit' }
+
+    -- Default config for set-up
+    local defaultConfig = {
+        maxCockpitViewAngle = 180,
+        engineCompartmentIndex = 4,
+        hasRearEngine = false
+    }
+
+    obj.options = mergeTables(defaultConfig, options)
+
+    assert(IsModelInCdimage(GetHashKey(obj.options.model)), '^1Invalid model')
+    assert(type(obj.options.coords) == 'vector4', '^1Invalid vector4')
 
     obj:CreateCams()
     obj:SpawnVehicle()
@@ -105,7 +127,7 @@ function Inspector:SpawnVehicle(model)
         local player = PlayerPedId()
 
         -- Load the model
-        local model = GetHashKey(self.model)
+        local model = GetHashKey(self.options.model)
 
         if not HasModelLoaded(model) and IsModelInCdimage(model) then
             RequestModel(model)
@@ -116,7 +138,7 @@ function Inspector:SpawnVehicle(model)
         end
     
         -- Create the vehicle
-        local vehicle = CreateVehicle(model, self.coords.xyz, self.coords.w, false, false)
+        local vehicle = CreateVehicle(model, self.options.coords.xyz, self.options.coords.w, false, false)
     
         local netid = NetworkGetNetworkIdFromEntity(vehicle)
         SetVehicleHasBeenOwnedByPlayer(vehicle, true)
@@ -128,18 +150,19 @@ function Inspector:SpawnVehicle(model)
         FreezeEntityPosition(vehicle, true) -- Prevent driving
         SetModelAsNoLongerNeeded(model)
 
-        self.isRearEngined = BackEngineVehicles[model]
+        self.hasValidEngineBay = false
+        self.isRearEngined = RearEnginedVehicles[model] or self.options.hasRearEngine
 
-        self.hasValidEngineBay = GetIsDoorValid(vehicle, self.isRearEngined and 5 or 4)
-
-        if self.isRearEngined == 'flipped' then
-            self.hasValidEngineBay = GetIsDoorValid(vehicle, 4)
+        if self.isRearEngined then
+            self.hasValidEngineBay = GetIsDoorValid(vehicle, self.options.engineCompartmentIndex or 5)
+        else
+            self.hasValidEngineBay = GetIsDoorValid(vehicle, self.options.engineCompartmentIndex or 4)
         end
 
         SetEntityAlpha(player, 0) -- Hide the player so we can see the interior
     
         -- Make sure we have collisions loaded
-        RequestCollisionAtCoord(self.coords.xyz)
+        RequestCollisionAtCoord(self.options.coords.xyz)
         while not HasCollisionLoadedAroundEntity(vehicle) do
             Citizen.Wait(0)
         end
@@ -314,9 +337,9 @@ function Inspector:CreateThreads()
 
                         SetCamRot(
                             self.currentCam,
-                            -((y - 0.5) * 180.00),
+                            -((y - 0.5) * 90.00),
                             0,
-                            -((x - 0.5) * 180.00) + self.currentRotation, 
+                            -((x - 0.5) * self.options.maxCockpitViewAngle) + self.currentRotation, 
                             2
                         )
                     end
