@@ -21,11 +21,16 @@ client_scripts {
  Simply pass the model name of the vehicle you want to spawn and the coords (as a `vector4` type) to the constructor:
  ```lua
  local myInspector = Inspector:Create({
-    model = 'adder',
-    coords = vector4(-791.61, -217.96, 36.40, 90.00),
-    hasRearEngine = true,
-    engineCompartmentIndex = 5,
-    primaryColor = { r = 255, g = 255, b = 255 }    
+    model = 'adder', -- the vehicle model name
+    coords = vector4(-791.61, -217.96, 36.40, 90.00), -- the spawn coords
+    hasRearEngine = true, -- whether the vehicle is rear / mid-engined
+    engineCompartmentIndex = 5, -- engine compartment doorIndex
+    revolve = true, -- whether to set the vehicle as revolving when entering inspector
+    rotate = true, -- whether to allow mouse-controlled rotation
+    zoom = true, -- whether to allow zoom in / out
+    toggleEngine = true, -- whether to allow toggling the engine on and off
+    views = { 'front', 'rear', 'side', 'wheel', 'engine', 'cockpit' } -- available views
+    primaryColor = { r = 255, g = 255, b = 255 } -- set the vehicle's primary colour
  })
  ```
  
@@ -76,7 +81,7 @@ If the vehicle's engine compartment doesn't function then the instance will auto
  ---
 
  ## ToDo
- * Allow controls to be customised
- * Allow setting of vehicle attributes / mods
- * Allow custom offsets / rotations for cameras
- * Some custom vehicles are badly made and the bounding boxes are off center which can cause the front / rear cameras to be misaligned - need to find a way of fixing this. Possibly use bones for alignment.
+- [ ] Allow controls to be customised
+- [ ] Allow setting of vehicle attributes / mods
+- [ ] Allow custom offsets / rotations for cameras
+- [x] Some custom vehicles are badly made and the bounding boxes are off center which can cause the front / rear cameras to be misaligned - need to find a way of fixing this. Possibly use bones for alignment.
