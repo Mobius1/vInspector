@@ -66,7 +66,45 @@ function Inspector:Create(options)
     local player = PlayerPedId()
     obj.playerCoords = GetEntityCoords(player)
     obj.playerHeading = GetEntityHeading(player)
+
+    -- Default config for set-up
+    local defaultConfig = {
+        maxCockpitViewAngle = 180,
+        engineCompartmentIndex = 4,
+        hasRearEngine = false,
+        primaryColor = { r = 255, g = 255, b = 255 },
+        revolve = true,
+        rotate = true,
+        zoom = true,
+        toggleEngine = true,
+        views = { 'main', 'front', 'rear', 'side', 'wheel', 'engine', 'cockpit' }
+    }
+
+    obj.options = mergeTables(defaultConfig, options)
+
+    if options.primaryColor then
+        obj.options.primaryColor = mergeTables(defaultConfig.primaryColor, options.primaryColor)
+    end
+
+    if options.views then
+        obj.options.views = options.views
+    end
+
+    local found = false
+    for _, v in ipairs(obj.options.views) do
+        if v == 'main' then
+            found = true
+            break
+        end
+    end
         
+    if not found then
+        table.insert(obj.options.views, 'main')
+    end
+
+    assert(IsModelInCdimage(GetHashKey(obj.options.model)), '^1Invalid model')
+    assert(type(obj.options.coords) == 'vector4', '^1Invalid vector4')
+
     obj.camCoords = vector3(0,0,0)
     obj.camRotation = vector3(0,0,0)
     obj.FOV = 60
@@ -79,7 +117,7 @@ function Inspector:Create(options)
     obj.camRotY = 0  
     obj.timestamp = nil
     obj.mouseDown = false
-    obj.revolve = false
+    obj.revolve = obj.options.revolve
     obj.lastRevolve = false
     obj.firstDown = true
     obj.inertia = 0
@@ -87,19 +125,6 @@ function Inspector:Create(options)
     obj.initialised = false
     obj.KillThread = false
     obj.callbacks = {}
-    obj.views = { 'main', 'front', 'rear', 'side', 'wheel', 'engine', 'cockpit' }
-
-    -- Default config for set-up
-    local defaultConfig = {
-        maxCockpitViewAngle = 180,
-        engineCompartmentIndex = 4,
-        hasRearEngine = false
-    }
-
-    obj.options = mergeTables(defaultConfig, options)
-
-    assert(IsModelInCdimage(GetHashKey(obj.options.model)), '^1Invalid model')
-    assert(type(obj.options.coords) == 'vector4', '^1Invalid vector4')
 
     obj:CreateCams()
     obj:SpawnVehicle()
@@ -117,7 +142,7 @@ end
 function Inspector:CreateCams()
     self.cams = {}
 
-    for _, view in ipairs(self.views) do
+    for _, view in ipairs(self.options.views) do
         self.cams[view] = CreateCamWithParams("DEFAULT_SCRIPTED_CAMERA", vector3(0,0,0), vector3(0,0,0), self.FOV * 1.0)
     end
 end
@@ -149,6 +174,8 @@ function Inspector:SpawnVehicle(model)
         SetVehicleHandbrake(vehicle, true) -- Prevent driving
         FreezeEntityPosition(vehicle, true) -- Prevent driving
         SetModelAsNoLongerNeeded(model)
+
+        SetVehicleCustomPrimaryColour(vehicle, self.options.primaryColor.r, self.options.primaryColor.g, self.options.primaryColor.b)
 
         self.hasValidEngineBay = false
         self.isRearEngined = RearEnginedVehicles[model] or self.options.hasRearEngine
@@ -245,49 +272,53 @@ function Inspector:CreateThreads()
             while true do
                 if not self.transitioning then
                     if self.currentView == 'main' then
-                        if IsDisabledControlJustPressed(0, 24) then
-                            self:OnMouseDown()
-                        elseif IsDisabledControlJustReleased(0, 24) then
-                            self:OnMouseUp()
+                        if self.options.rotate then
+                            if IsDisabledControlJustPressed(0, 24) then
+                                self:OnMouseDown()
+                            elseif IsDisabledControlJustReleased(0, 24) then
+                                self:OnMouseUp()
+                            end
                         end
 
-                        if IsControlPressed(0, 15) then
-                            if self.FOV > 1.0 then
-                                self.FOV = self.FOV - 1.0
-                                SetCamFov(self.currentCam, self.FOV * 1.0)
+                        if self.options.zoom then
+                            if IsControlPressed(0, 15) then
+                                if self.FOV > 1.0 then
+                                    self.FOV = self.FOV - 1.0
+                                    SetCamFov(self.currentCam, self.FOV * 1.0)
+                                end
+                            elseif IsControlPressed(0, 14) then
+                                if self.FOV < 130.0 then
+                                    self.FOV = self.FOV + 1.0
+                                    SetCamFov(self.currentCam, self.FOV * 1.0)
+                                end                    
                             end
-                        elseif IsControlPressed(0, 14) then
-                            if self.FOV < 130.0 then
-                                self.FOV = self.FOV + 1.0
-                                SetCamFov(self.currentCam, self.FOV * 1.0)
-                            end                    
                         end
                     end
 
                     if IsDisabledControlJustPressed(0, 22) then -- TOGGLE REVOLVE
                         self.revolve = not self.revolve
                         self.inertia = 0
-                    elseif IsDisabledControlJustPressed(0, 23) then -- SET FRONT VIEW
+                    elseif IsDisabledControlJustPressed(0, 23) and self.cams.front then -- SET FRONT VIEW
                         self.revolve = false
                         self.inertia = 0
                         self:SetView('front')          
-                    elseif IsDisabledControlJustPressed(0, 47) then -- SET WHEEL VIEW
+                    elseif IsDisabledControlJustPressed(0, 47) and self.cams.wheel then -- SET WHEEL VIEW
                         self.revolve = false
                         self.inertia = 0
                         self:SetView('wheel')
-                    elseif IsDisabledControlJustPressed(0, 45) then -- SET REAR VIEW
+                    elseif IsDisabledControlJustPressed(0, 45) and self.cams.rear then -- SET REAR VIEW
                         self.revolve = false
                         self.inertia = 0
                         self:SetView('rear')
-                    elseif IsDisabledControlJustPressed(0, 33) then -- SET SIDE VIEW
+                    elseif IsDisabledControlJustPressed(0, 33) and self.cams.side then -- SET SIDE VIEW
                         self.revolve = false
                         self.inertia = 0
                         self:SetView('side')
-                    elseif IsDisabledControlJustPressed(0, 26) then -- SET COCKPIT VIEW
+                    elseif IsDisabledControlJustPressed(0, 26) and self.cams.cockpit then -- SET COCKPIT VIEW
                         self.revolve = false
                         self.inertia = 0
                         self:SetView('cockpit')
-                    elseif IsDisabledControlJustPressed(0, 38) then -- SET ENGINE VIEW
+                    elseif IsDisabledControlJustPressed(0, 38) and self.cams.engine then -- SET ENGINE VIEW
                         if self.hasValidEngineBay then
                             self.revolve = false
                             self.inertia = 0
@@ -299,7 +330,7 @@ function Inspector:CreateThreads()
                         else
                             self:SetView('main')
                         end
-                    elseif IsDisabledControlJustPressed(0, 21) then -- ENGINE
+                    elseif IsDisabledControlJustPressed(0, 21) and self.options.toggleEngine then -- ENGINE
                         self.engineRunning = not self.engineRunning
                         SetVehicleEngineOn(self.vehicle, self.engineRunning, false, true)
                     end
@@ -318,6 +349,7 @@ function Inspector:CreateThreads()
             while true do
                 -- Display instructional buttons
                 DrawScaleformMovieFullscreen(self.buttons, 255, 255, 255, 255, 0)
+                
 
                 self:DisableActions()
 
@@ -344,48 +376,50 @@ function Inspector:CreateThreads()
                         )
                     end
 
-                    if self.mouseDown then
-                        local x, y = self:GetMousePosition()
+                    if self.options.rotate then
+                        if self.mouseDown then
+                            local x, y = self:GetMousePosition()
 
-                        if self.timestamp == nil then
-                            self.timestamp = GetGameTimer()
-                        end
-        
-                        local now = GetGameTimer()
-                        local dt =  now - self.timestamp
-                        local dx = x - self.lastX
-                        local speedX = math.abs(dx / dt)
-
-                        self.inertia = speedX / 2
-
-                        if dt > 0 then
-                            if x < self.lastX then
-                                self.direction = 0
-                                self:SetVehicleRotation(self.currentRotation - speedX)
-                            elseif x > self.lastX then
-                                self.direction = 1
-                                self:SetVehicleRotation(self.currentRotation + speedX)
+                            if self.timestamp == nil then
+                                self.timestamp = GetGameTimer()
                             end
-                        end
-        
-                        self.lastX = x
-                        self.timestamp = now;
-                    else
-                        local min = 0
-                        if self.revolve then
-                            min = 0.2
-                        end
+            
+                            local now = GetGameTimer()
+                            local dt =  now - self.timestamp
+                            local dx = x - self.lastX
+                            local speedX = math.abs(dx / dt)
 
-                        if self.inertia > min then
-                            if self.direction > 0 then
-                                self:SetVehicleRotation(self.currentRotation + self.inertia)
-                            else
-                                self:SetVehicleRotation(self.currentRotation - self.inertia)
+                            self.inertia = speedX / 2
+
+                            if dt > 0 then
+                                if x < self.lastX then
+                                    self.direction = 0
+                                    self:SetVehicleRotation(self.currentRotation - speedX)
+                                elseif x > self.lastX then
+                                    self.direction = 1
+                                    self:SetVehicleRotation(self.currentRotation + speedX)
+                                end
+                            end
+            
+                            self.lastX = x
+                            self.timestamp = now;
+                        else
+                            local min = 0
+                            if self.revolve then
+                                min = 0.2
                             end
 
-                            self.inertia = self.inertia - 0.025
-                        end
-                    end                
+                            if self.inertia > min then
+                                if self.direction > 0 then
+                                    self:SetVehicleRotation(self.currentRotation + self.inertia)
+                                else
+                                    self:SetVehicleRotation(self.currentRotation - self.inertia)
+                                end
+
+                                self.inertia = self.inertia - 0.025
+                            end
+                        end              
+                    end              
                 end                
                 
                 if self.KillThread then
@@ -447,38 +481,46 @@ function Inspector:SetButtons(view)
         { text = "Exit", key = 194 }
     }
     
-    if self.hasValidEngineBay and view ~= 'engine' then
+    if self.hasValidEngineBay and view ~= 'engine' and self.cams.engine then
         table.insert(buttons, { text = "Engine View", key = 38 })
     end
 
-    if view ~= 'wheel' then
+    if view ~= 'wheel' and self.cams.wheel then
         table.insert(buttons, { text = "Wheel View", key = 47 })
     end
 
-    if view ~= 'side' then
+    if view ~= 'side' and self.cams.side then
         table.insert(buttons, { text = "Side View", key = 33 })
     end
     
-    if view ~= 'rear' then
+    if view ~= 'rear' and self.cams.rear then
         table.insert(buttons, { text = "Rear View", key = 45 })
     end
 
-    if view ~= 'cockpit' then
+    if view ~= 'cockpit' and self.cams.cockpit then
         table.insert(buttons, { text = "Cockpit View", key = 26 })
     end
 
-    if view ~= 'front' then
+    if view ~= 'front' and self.cams.front then
         table.insert(buttons, { text = "Front View", key = 23 })
     end 
 
-    if view == 'main' then
-        table.insert(buttons, { text = "Zoom In", key = 14 })
-        table.insert(buttons, { text = "Zoom Out", key = 15 })
-        table.insert(buttons, { text = "Rotate",  key = 1 })
+    if view == 'main' and self.cams.main then
+        if self.options.zoom then
+            table.insert(buttons, { text = "Zoom In", key = 14 })
+            table.insert(buttons, { text = "Zoom Out", key = 15 })
+        end
+
+        if self.options.rotate then
+            table.insert(buttons, { text = "Rotate",  key = 1 })
+        end
+
         table.insert(buttons, { text = "Toggle Revolve",  key = 22 })
     end
 
-    table.insert(buttons, { text = "Toggle Engine",   key = 21 })
+    if self.options.toggleEngine then
+        table.insert(buttons, { text = "Toggle Engine",   key = 21 })
+    end
 
     return buttons
 end
@@ -551,7 +593,6 @@ function Inspector:SetView(view)
             RenderScriptCams(true, true, 1000, true, false)
             SetCamAffectsAiming(self.currentCam, false) 
         else
-            -- SetCamParams(self.cams[view], coords.x, coords.y, coords.z, rotation.x, rotation.y, rotation.z, self.FOV * 1.0, 1000, 0, 0, 2)
             SetCamCoord(self.cams[view], coords.x, coords.y, coords.z)
             SetCamRot(self.cams[view], rotation.x, rotation.y, rotation.z, 2)
             SetCamFov(self.cams[view], self.FOV * 1.0)
@@ -561,34 +602,6 @@ function Inspector:SetView(view)
 
             self.currentCam = self.cams[view]
         end
-
-
-        -- if self.currentCam == nil then
-        --     self.currentCam = CreateCamWithParams("DEFAULT_SCRIPTED_CAMERA", coords, rotation, self.FOV * 1.0)
-
-        --     SetCamActive(self.currentCam, true)
-
-        --     RenderScriptCams(true, true, 1000, true, false)
-    
-        --     SetCamAffectsAiming(self.currentCam, false)
-        -- else
-        --     local currentCam = CreateCamWithParams("DEFAULT_SCRIPTED_CAMERA", coords, rotation, self.FOV * 1.0)
-
-        --     -- Animate cam position / rotation
-        --     SetCamActiveWithInterp(currentCam, self.currentCam, 1000, 1, 1)
-
-        --     -- Wait for cam to finish transitioning
-        --     Wait(1100)
-
-        --     -- There seems to be a limit of 25 cameras
-        --     -- so lets destroy the previous one here otherwise subsequent cams won't work
-
-        --     -- TODO: Create camera for each view when initialising instance instead of creating them here
-        --     DestroyCam(self.currentCam, true)
-
-        --     -- Set the current cam to the newly created one
-        --     self.currentCam = currentCam
-        -- end
 
         self.transitioning = false
 
@@ -643,20 +656,18 @@ end
 
 function Inspector:GetFrontOfVehicle()
     local bounds = self:GetEntityBounds(self.vehicle)
-    local topFront = self:GetCentreOfVectors(bounds[7], bounds[8])
     local bottomFront = self:GetCentreOfVectors(bounds[3], bounds[4])
-    local center = self:GetCentreOfVectors(topFront, bottomFront)
+    local chassis = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'chassis_dummy'))
 
-    return self:TranslateVector(center, self.currentRotation, -1.25)
+    return self:TranslateVector(chassis, self.currentRotation, -#(chassis - bottomFront) + -1.25)
 end
 
 function Inspector:GetRearOfVehicle()
     local bounds = self:GetEntityBounds(self.vehicle)
-    local topFront = self:GetCentreOfVectors(bounds[5], bounds[6])
     local bottomFront = self:GetCentreOfVectors(bounds[1], bounds[2])
-    local center = self:GetCentreOfVectors(topFront, bottomFront)
-
-    return self:TranslateVector(center, self.currentRotation, 1.25)
+    local chassis = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'chassis_dummy'))
+    
+    return self:TranslateVector(chassis, self.currentRotation, #(chassis - bottomFront) + 1.25)    
 end
 
 function Inspector:GetSideOfVehicle()
@@ -682,9 +693,13 @@ function Inspector:GetEntityBounds(entity)
         -- TOP
         GetOffsetFromEntityInWorldCoords(entity, min.x - pad, min.y - pad, max.z + pad), -- REAR RIGHT
         GetOffsetFromEntityInWorldCoords(entity, max.x + pad, min.y - pad, max.z + pad), -- REAR LEFT
-        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, max.y + pad, max.z + pad), -- FROM LEFT
-        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, max.y + pad, max.z + pad), -- FROM RIGHT
+        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, max.y + pad, max.z + pad), -- FRONT LEFT
+        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, max.y + pad, max.z + pad), -- FRONT RIGHT
     }
+end
+
+function Inspector:GetCentreOfVectors(v1, v2)
+    return vector3((v1.x+v2.x)/2.0,(v1.y+v2.y)/2.0,(v1.z+v2.z)/2.0)
 end
 
 function Inspector:TranslateVector(p, dir, dist)
@@ -692,10 +707,6 @@ function Inspector:TranslateVector(p, dir, dist)
     local x = p.x + dist * math.cos(angle)
     local y = p.y + dist * math.sin(angle)
     return vector3(x, y, p.z)
-end
-
-function Inspector:GetCentreOfVectors(v1, v2)
-    return vector3((v1.x+v2.x)/2.0,(v1.y+v2.y)/2.0,(v1.z+v2.z)/2.0)
 end
 
 function Inspector:SetButtonMessage(text)
