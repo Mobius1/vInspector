@@ -1,45 +1,46 @@
 -- List of rear / mid-engined vehicles
-RearEnginedVehicles = {
-    [`ninef`] = true,
+local RearEnginedVehicles = {
     [`adder`] = true,
-    [`vagner`] = true,
-    [`t20`] = true,
-    [`infernus`] = true,
-    [`zentorno`] = true,
-    [`reaper`] = true,
-    [`comet2`] = true,
-    [`comet3`] = true,
-    [`jester`] = true,
-    [`jester2`] = true,
+    [`ardent`] = true,
+    [`autarch`] = true,
+    [`bullet`] = true,
     [`cheetah`] = true,
     [`cheetah2`] = true,
-    [`prototipo`] = true,
-    [`turismor`] = true,
-    [`pfister811`] = true,
-    [`ardent`] = true,
+    [`comet2`] = true,
+    [`comet3`] = true,
+    [`entityxf`] = true,
+    [`fmj`] = true,
+    [`gp1`] = true,
+    [`infernus`] = true,
+    [`italigtb`] = true,
+    [`jester`] = true,
+    [`jester2`] = true,
+    [`monroe`] = true,
     [`nero`] = true,
     [`nero2`] = true,
-    [`tempesta`] = true,
-    [`vacca`] = true,
-    [`bullet`] = true,
-    [`osiris`] = true,
-    [`entityxf`] = true,
-    [`turismo2`] = true,
-    [`fmj`] = true,
-    [`re7b`] = true,
-    [`tyrus`] = true,
-    [`italigtb`] = true,
-    [`penetrator`] = true,
-    [`monroe`] = true,
+    [`ninef`] = true,
     [`ninef2`] = true,
+    [`osiris`] = true,
+    [`penetrator`] = true,
+    [`pfister811`] = true,
+    [`prototipo`] = true,
+    [`re7b`] = true,
+    [`reaper`] = true,
     [`stingergt`] = true,
     [`surfer`] = true,
     [`surfer2`] = true,
-    [`gp1`] = true,
-    [`autarch`] = true,
+    [`t20`] = true,
+    [`tempesta`] = true,
+    [`turismo2`] = true,
+    [`turismor`] = true,
     [`tyrant`] = true,
+    [`tyrus`] = true,
+    [`vacca`] = true,
+    [`vagner`] = true,
+    [`zentorno`] = true
 }
 
+-- Merge tables
 local function mergeTables(t1, t2)
     for k,v in pairs(t2) do
         if type(v) == "table" then
@@ -55,6 +56,40 @@ local function mergeTables(t1, t2)
     return t1
 end
 
+-- Get vehicle's bounding box
+local function GetEntityBounds(entity)
+    local min, max = GetModelDimensions(GetEntityModel(entity))
+    local pad = 0.00
+
+    return {
+        -- BOTTOM
+        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, min.y - pad, min.z - pad), -- REAR LEFT
+        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, min.y - pad, min.z - pad), -- REAR RIGHT
+        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, max.y + pad, min.z - pad), -- FRONT RIGHT
+        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, max.y + pad, min.z - pad), -- FRONT LEFT
+
+        -- TOP
+        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, min.y - pad, max.z + pad), -- REAR RIGHT
+        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, min.y - pad, max.z + pad), -- REAR LEFT
+        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, max.y + pad, max.z + pad), -- FRONT LEFT
+        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, max.y + pad, max.z + pad), -- FRONT RIGHT
+    }
+end
+
+-- Get the centre of two vectors
+local function GetCentreOfVectors(v1, v2)
+    return vector3((v1.x+v2.x)/2.0,(v1.y+v2.y)/2.0,(v1.z+v2.z)/2.0)
+end
+
+-- Translate vector by angle and distance
+local function TranslateVector(p, dir, dist)
+    local angle = math.rad(dir - 90)
+    local x = p.x + dist * math.cos(angle)
+    local y = p.y + dist * math.sin(angle)
+    return vector3(x, y, p.z)
+end
+
+-- Inspector class
 Inspector = {}
 Inspector.__index = Inspector
 
@@ -538,7 +573,7 @@ function Inspector:SetView(view)
 
         if view == 'main' then
             coords = vector3(self.spawnCoords.x, self.spawnCoords.y, self.spawnCoords.z + 1.0)
-            coords = self:TranslateVector(coords, self.spawnHeading - 180, 4.00)
+            coords = TranslateVector(coords, self.spawnHeading - 180, 4.00)
             rotation = vector3(-20.0, 0, self.spawnHeading - 180)     
         elseif view == 'front' then
             coords = self:GetFrontOfVehicle()
@@ -551,7 +586,7 @@ function Inspector:SetView(view)
             rotation = vector3(0, 0, self.currentRotation - 90)             
         elseif view == 'wheel' then
             coords = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'wheel_lf'))
-            coords = self:TranslateVector(coords, self.currentRotation - 90, 1.00)
+            coords = TranslateVector(coords, self.currentRotation - 90, 1.00)
             rotation = vector3(0, 0, self.currentRotation - 90)           
         elseif view == 'cockpit' then       
             SetCursorLocation(0.5, 0.5)
@@ -563,7 +598,7 @@ function Inspector:SetView(view)
             coords = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'engine'))
 
             if self.isRearEngined then
-                coords = self:TranslateVector(coords, self.currentRotation, 1.00)
+                coords = TranslateVector(coords, self.currentRotation, 1.00)
                 coords = coords + vector3(0, 0, 0.8)
                 rotation = vector3(-35.0, 0, self.currentRotation)
 
@@ -573,7 +608,7 @@ function Inspector:SetView(view)
                     SetVehicleDoorOpen(self.vehicle, 5, false, false)
                 end
             else
-                coords = self:TranslateVector(coords, self.currentRotation - 180, 1.00)
+                coords = TranslateVector(coords, self.currentRotation - 180, 1.00)
                 coords = coords + vector3(0, 0, 0.8)
                 rotation = vector3(-35.0, 0, self.currentRotation - 180)
 
@@ -655,58 +690,28 @@ function Inspector:GetMousePosition()
 end
 
 function Inspector:GetFrontOfVehicle()
-    local bounds = self:GetEntityBounds(self.vehicle)
-    local bottomFront = self:GetCentreOfVectors(bounds[3], bounds[4])
+    local bounds = GetEntityBounds(self.vehicle)
+    local bottomFront = GetCentreOfVectors(bounds[3], bounds[4])
     local chassis = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'chassis_dummy'))
 
-    return self:TranslateVector(chassis, self.currentRotation, -#(chassis - bottomFront) + -1.25)
+    return TranslateVector(chassis, self.currentRotation, -#(chassis - bottomFront) + -1.25)
 end
 
 function Inspector:GetRearOfVehicle()
-    local bounds = self:GetEntityBounds(self.vehicle)
-    local bottomFront = self:GetCentreOfVectors(bounds[1], bounds[2])
+    local bounds = GetEntityBounds(self.vehicle)
+    local bottomFront = GetCentreOfVectors(bounds[1], bounds[2])
     local chassis = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'chassis_dummy'))
     
-    return self:TranslateVector(chassis, self.currentRotation, #(chassis - bottomFront) + 1.25)    
+    return TranslateVector(chassis, self.currentRotation, #(chassis - bottomFront) + 1.25)    
 end
 
 function Inspector:GetSideOfVehicle()
-    local bounds = self:GetEntityBounds(self.vehicle)
-    local topFront = self:GetCentreOfVectors(bounds[6], bounds[7])
-    local bottomFront = self:GetCentreOfVectors(bounds[1], bounds[4])
-    local center = self:GetCentreOfVectors(topFront, bottomFront)
+    local bounds = GetEntityBounds(self.vehicle)
+    local topFront = GetCentreOfVectors(bounds[6], bounds[7])
+    local bottomFront = GetCentreOfVectors(bounds[1], bounds[4])
+    local center = GetCentreOfVectors(topFront, bottomFront)
 
-    return self:TranslateVector(center, self.currentRotation - 90, 3.25)
-end
-
-function Inspector:GetEntityBounds(entity)
-    local min, max = GetModelDimensions(GetEntityModel(entity))
-    local pad = 0.00
-
-    return {
-        -- BOTTOM
-        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, min.y - pad, min.z - pad), -- REAR LEFT
-        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, min.y - pad, min.z - pad), -- REAR RIGHT
-        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, max.y + pad, min.z - pad), -- FRONT RIGHT
-        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, max.y + pad, min.z - pad), -- FRONT LEFT
-
-        -- TOP
-        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, min.y - pad, max.z + pad), -- REAR RIGHT
-        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, min.y - pad, max.z + pad), -- REAR LEFT
-        GetOffsetFromEntityInWorldCoords(entity, max.x + pad, max.y + pad, max.z + pad), -- FRONT LEFT
-        GetOffsetFromEntityInWorldCoords(entity, min.x - pad, max.y + pad, max.z + pad), -- FRONT RIGHT
-    }
-end
-
-function Inspector:GetCentreOfVectors(v1, v2)
-    return vector3((v1.x+v2.x)/2.0,(v1.y+v2.y)/2.0,(v1.z+v2.z)/2.0)
-end
-
-function Inspector:TranslateVector(p, dir, dist)
-    local angle = math.rad(dir - 90)
-    local x = p.x + dist * math.cos(angle)
-    local y = p.y + dist * math.sin(angle)
-    return vector3(x, y, p.z)
+    return TranslateVector(center, self.currentRotation - 90, 3.25)
 end
 
 function Inspector:SetButtonMessage(text)
