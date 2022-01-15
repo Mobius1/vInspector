@@ -25,6 +25,8 @@ client_scripts {
     coords = vector4(-791.61, -217.96, 36.40, 90.00), -- the spawn coords
     hasRearEngine = true, -- whether the vehicle is rear / mid-engined
     engineCompartmentIndex = 5, -- engine compartment doorIndex
+    easeIn = false, -- whether to smoothly transition to the inspector camera
+    easeOut = false, -- whether to smoothly transition back to the player camera
     revolve = true, -- whether to set the vehicle as revolving when entering inspector
     rotate = true, -- whether to allow mouse-controlled rotation
     zoom = true, -- whether to allow zoom in / out

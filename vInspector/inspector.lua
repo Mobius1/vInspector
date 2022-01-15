@@ -112,7 +112,9 @@ function Inspector:Create(options)
         rotate = true,
         zoom = true,
         toggleEngine = true,
-        views = { 'main', 'front', 'rear', 'side', 'wheel', 'engine', 'cockpit' }
+        views = { 'main', 'front', 'rear', 'side', 'wheel', 'engine', 'cockpit' },
+        easeIn = false,
+        easeOut = false,
     }
 
     obj.options = mergeTables(defaultConfig, options)
@@ -279,7 +281,7 @@ function Inspector:Destroy()
     self.KillThread = true
 
     ClearFocus()
-    RenderScriptCams(0, false, 0, true, false)
+    RenderScriptCams(0, self.options.easeOut, 1000, true, false)
     DestroyAllCams(true)
     
     self.cams = {}
@@ -625,7 +627,8 @@ function Inspector:SetView(view)
             SetCamRot(self.currentCam, rotation.x, rotation.y, rotation.z, 2)
             SetCamFov(self.currentCam, self.FOV * 1.0)
             SetCamActive(self.currentCam, true)
-            RenderScriptCams(true, true, 1000, true, false)
+            RenderScriptCams(true, self.options.easeIn, 1000, true, false)
+
             SetCamAffectsAiming(self.currentCam, false) 
         else
             SetCamCoord(self.cams[view], coords.x, coords.y, coords.z)
