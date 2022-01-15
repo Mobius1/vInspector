@@ -2,6 +2,8 @@
  Vehicle inspector for FiveM
 
  Creates dynamic showroom cameras to inspect a vehicle and adds interactive rotation with the mouse. Useful for cardealers / showrooms.
+
+ [Demo Video](https://streamable.com/etw0i2)
  
  ## Installation
 * Drop the `vInspector` directory into you `resources` directory
