@@ -160,6 +160,7 @@ function Inspector:Create(options)
     obj.inertia = 0
     obj.direction = 0
     obj.initialised = false
+    obj.showUI = true
     obj.KillThread = false
     obj.callbacks = {}
 
@@ -210,18 +211,20 @@ function Inspector:SpawnVehicle(model)
         SetVehicleEngineOn(vehicle, false, false, true)
         SetVehicleHandbrake(vehicle, true) -- Prevent driving
         FreezeEntityPosition(vehicle, true) -- Prevent driving
+        SetVehicleDirtLevel(vehicle, 0.0)
         SetModelAsNoLongerNeeded(model)
 
         SetVehicleCustomPrimaryColour(vehicle, self.options.primaryColor.r, self.options.primaryColor.g, self.options.primaryColor.b)
 
-        self.hasValidEngineBay = false
         self.isRearEngined = RearEnginedVehicles[model] or self.options.hasRearEngine
 
         if self.isRearEngined then
-            self.hasValidEngineBay = GetIsDoorValid(vehicle, self.options.engineCompartmentIndex or 5)
+            self.options.engineCompartmentIndex = self.options.engineCompartmentIndex or 5
         else
-            self.hasValidEngineBay = GetIsDoorValid(vehicle, self.options.engineCompartmentIndex or 4)
+            self.options.engineCompartmentIndex = self.options.engineCompartmentIndex or 4
         end
+
+        self.hasValidEngineBay = GetIsDoorValid(vehicle, self.options.engineCompartmentIndex)
 
         SetEntityAlpha(player, 0) -- Hide the player so we can see the interior
     
@@ -238,8 +241,8 @@ function Inspector:SpawnVehicle(model)
         self.spawnCoords = GetEntityCoords(self.vehicle)
         self.spawnHeading = GetEntityHeading(self.vehicle)        
         self.currentRotation = GetEntityRotation(self.vehicle).z
+        self.currentBounds = GetEntityBounds(self.vehicle)
 
-        -- TriggerEvent('viewer:client:start')
         self:Start()
     end)
 end
@@ -385,7 +388,9 @@ function Inspector:CreateThreads()
         Citizen.CreateThread(function()
             while true do
                 -- Display instructional buttons
-                DrawScaleformMovieFullscreen(self.buttons, 255, 255, 255, 255, 0)
+                if self.showUI then
+                    DrawScaleformMovieFullscreen(self.buttons, 255, 255, 255, 255, 0)
+                end
                 
 
                 self:DisableActions()
@@ -603,19 +608,13 @@ function Inspector:SetView(view)
                 coords = TranslateVector(coords, self.currentRotation, 1.00)
                 coords = coords + vector3(0, 0, 0.8)
                 rotation = vector3(-35.0, 0, self.currentRotation)
-
-                if self.isRearEngined == 'flipped' then
-                    SetVehicleDoorOpen(self.vehicle, 4, false, false)
-                else
-                    SetVehicleDoorOpen(self.vehicle, 5, false, false)
-                end
             else
                 coords = TranslateVector(coords, self.currentRotation - 180, 1.00)
                 coords = coords + vector3(0, 0, 0.8)
                 rotation = vector3(-35.0, 0, self.currentRotation - 180)
-
-                SetVehicleDoorOpen(self.vehicle, 4, false, false)
-            end        
+            end     
+            
+            SetVehicleDoorOpen(self.vehicle, self.options.engineCompartmentIndex, false, false)
         end
 
         self.currentView = view
@@ -693,23 +692,35 @@ function Inspector:GetMousePosition()
 end
 
 function Inspector:GetFrontOfVehicle()
-    local bounds = GetEntityBounds(self.vehicle)
+    local bounds = self.currentBounds
+
+    local topRight = GetCentreOfVectors(bounds[6], bounds[7])
+    local bottomRight = GetCentreOfVectors(bounds[1], bounds[4])
+    local center = GetCentreOfVectors(topRight, bottomRight)
+
     local bottomFront = GetCentreOfVectors(bounds[3], bounds[4])
     local chassis = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'chassis_dummy'))
+    chassis = vector3(chassis.x, chassis.y, center.z)
 
     return TranslateVector(chassis, self.currentRotation, -#(chassis - bottomFront) + -1.25)
 end
 
 function Inspector:GetRearOfVehicle()
-    local bounds = GetEntityBounds(self.vehicle)
+    local bounds = self.currentBounds
+
+    local topRight = GetCentreOfVectors(bounds[6], bounds[7])
+    local bottomRight = GetCentreOfVectors(bounds[1], bounds[4])
+    local center = GetCentreOfVectors(topRight, bottomRight)
+
     local bottomFront = GetCentreOfVectors(bounds[1], bounds[2])
     local chassis = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'chassis_dummy'))
-    
-    return TranslateVector(chassis, self.currentRotation, #(chassis - bottomFront) + 1.25)    
+    chassis = vector3(chassis.x, chassis.y, center.z)
+
+    return TranslateVector(chassis, self.currentRotation, #(chassis - bottomFront) + 1.25)   
 end
 
 function Inspector:GetSideOfVehicle()
-    local bounds = GetEntityBounds(self.vehicle)
+    local bounds = self.currentBounds
     local topFront = GetCentreOfVectors(bounds[6], bounds[7])
     local bottomFront = GetCentreOfVectors(bounds[1], bounds[4])
     local center = GetCentreOfVectors(topFront, bottomFront)
@@ -777,4 +788,16 @@ function Inspector:On(event, cb)
     assert(self.callbacks[event] == nil, string.format("^1Event '%s' already registered", event))
 
     self.callbacks[event] = cb
+end
+
+function Inspector:HideUI()
+    self.showUI = false
+end
+
+function Inspector:ShowUI()
+    self.showUI = true
+end
+
+function Inspector:ToggleUI()
+    self.showUI = not self.showUI
 end
