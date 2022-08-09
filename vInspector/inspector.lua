@@ -40,6 +40,31 @@ local RearEnginedVehicles = {
     [`zentorno`] = true
 }
 
+local allowedClasses = {
+    [0] = true, -- Compacts  
+    [1] = true, -- Sedans  
+    [2] = true, -- SUVs  
+    [3] = true, -- Coupes  
+    [4] = true, -- Muscle  
+    [5] = true, -- Sports Classics  
+    [6] = true, -- Sports  
+    [7] = true, -- Super  
+    [8] = true, -- Motorcycles  
+    [9] = true, -- Off-road  
+    [10] = true, -- Industrial  
+    [11] = true, -- Utility  
+    [12] = true, -- Vans  
+    [13] = false, -- Cycles  
+    [14] = false, -- Boats  
+    [15] = false, -- Helicopters  
+    [16] = false, -- Planes  
+    [17] = true, -- Service  
+    [18] = true, -- Emergency  
+    [19] = true, -- Military  
+    [20] = true, -- Commercial  
+    [21] = false, -- Trains
+}
+
 -- Merge tables
 local function mergeTables(t1, t2)
     for k,v in pairs(t2) do
@@ -115,6 +140,8 @@ function Inspector:Create(options)
         views = { 'main', 'front', 'rear', 'side', 'wheel', 'engine', 'cockpit' },
         easeIn = false,
         easeOut = false,
+        fov = 60,
+        putInVehicle = false
     }
 
     obj.options = mergeTables(defaultConfig, options)
@@ -144,7 +171,7 @@ function Inspector:Create(options)
 
     obj.camCoords = vector3(0,0,0)
     obj.camRotation = vector3(0,0,0)
-    obj.FOV = 60
+    obj.FOV = obj.options.fov * 1.0
     obj.currentCam = nil
     obj.currentView = nil
         
@@ -216,6 +243,14 @@ function Inspector:SpawnVehicle(model)
 
         SetVehicleCustomPrimaryColour(vehicle, self.options.primaryColor.r, self.options.primaryColor.g, self.options.primaryColor.b)
 
+        self.vehicleType = GetVehicleClass(vehicle)
+
+        if allowedClasses[self.vehicleType] ~= true then
+            print("^1Vehicle class not allowed")
+            self:Destroy()
+            return
+        end
+
         self.isRearEngined = RearEnginedVehicles[model] or self.options.hasRearEngine
 
         if self.isRearEngined then
@@ -225,8 +260,6 @@ function Inspector:SpawnVehicle(model)
         end
 
         self.hasValidEngineBay = GetIsDoorValid(vehicle, self.options.engineCompartmentIndex)
-
-        SetEntityAlpha(player, 0) -- Hide the player so we can see the interior
     
         -- Make sure we have collisions loaded
         RequestCollisionAtCoord(self.options.coords.xyz)
@@ -235,7 +268,13 @@ function Inspector:SpawnVehicle(model)
         end
 
         -- Put player in vehicle
-        TaskWarpPedIntoVehicle(player, vehicle, -1)
+        if self.options.putInVehicle then
+            SetEntityAlpha(player, 0) -- Hide the player so we can see the interior
+            TaskWarpPedIntoVehicle(player, vehicle, -1)
+        else
+            FreezeEntityPosition(player, true)
+            self:SpawnClone(vehicle)
+        end
     
         self.vehicle = vehicle
         self.spawnCoords = GetEntityCoords(self.vehicle)
@@ -247,6 +286,21 @@ function Inspector:SpawnVehicle(model)
     end)
 end
 
+function Inspector:SpawnClone(vehicle)
+    if self.clone == nil then
+        self.clone = ClonePed(PlayerPedId(), false, false, false)
+        SetEntityAlpha(self.clone, 0) -- Hide the clone so we can see the interior
+        TaskWarpPedIntoVehicle(self.clone, vehicle, -1)
+    end    
+end
+
+function Inspector:RemoveClone()
+    if self.clone ~= nil then
+        DeleteEntity(self.clone)
+        self.clone = nil
+    end
+end
+
 function Inspector:DeleteVehicle()
     if self.vehicle then
         SetEntityAsMissionEntity(self.vehicle, false, true)
@@ -255,8 +309,14 @@ function Inspector:DeleteVehicle()
 
         -- Put the player back where they were
         local player = PlayerPedId()
-        SetEntityCoordsNoOffset(player, self.playerCoords.x, self.playerCoords.y, self.playerCoords.z, 0, 0, 0)
-        SetEntityHeading(player, self.playerHeading)
+
+        if self.options.putInVehicle then
+            SetEntityCoordsNoOffset(player, self.playerCoords.x, self.playerCoords.y, self.playerCoords.z, 0, 0, 0)
+            SetEntityHeading(player, self.playerHeading)
+        else
+            self:RemoveClone()
+        end
+
         ResetEntityAlpha(player)
         FreezeEntityPosition(player, false)
     end
@@ -289,7 +349,9 @@ function Inspector:Destroy()
     
     self.cams = {}
 
-    SetScaleformMovieAsNoLongerNeeded(self.buttons)
+    if self.buttons then
+        SetScaleformMovieAsNoLongerNeeded(self.buttons)
+    end
 
     DisplayRadar(true)
 
@@ -299,6 +361,7 @@ function Inspector:Destroy()
         self.callbacks.exit()
     end
 end
+
 
 function Inspector:CreateThreads()
     if not self.initialised then
@@ -579,8 +642,9 @@ function Inspector:SetView(view)
         SetVehicleDoorShut(self.vehicle, 5, false)
 
         if view == 'main' then
+            local offset = self.vehicleType == 8 and 2.00 or 4.00
             coords = vector3(self.spawnCoords.x, self.spawnCoords.y, self.spawnCoords.z + 1.0)
-            coords = TranslateVector(coords, self.spawnHeading - 180, 4.00)
+            coords = TranslateVector(coords, self.spawnHeading - 180, offset)
             rotation = vector3(-20.0, 0, self.spawnHeading - 180)     
         elseif view == 'front' then
             coords = self:GetFrontOfVehicle()
@@ -598,8 +662,11 @@ function Inspector:SetView(view)
         elseif view == 'cockpit' then       
             SetCursorLocation(0.5, 0.5)
 
-            local player = PlayerPedId()
-            coords = GetWorldPositionOfEntityBone(player, GetPedBoneIndex(player, 0x796E))
+            local driver = PlayerPedId() 
+            if not self.options.putInVehicle then
+                driver = self.clone
+            end
+            coords = GetWorldPositionOfEntityBone(driver, GetPedBoneIndex(driver, 0x796E))
             rotation = vector3(0.0, 0, self.currentRotation)           
         elseif view == 'engine' and self.hasValidEngineBay then       
             coords = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'engine'))
@@ -701,8 +768,9 @@ function Inspector:GetFrontOfVehicle()
     local bottomFront = GetCentreOfVectors(bounds[3], bounds[4])
     local chassis = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'chassis_dummy'))
     chassis = vector3(chassis.x, chassis.y, center.z)
+    local offset = self.vehicleType == 8 and -0.6 or -1.25
 
-    return TranslateVector(chassis, self.currentRotation, -#(chassis - bottomFront) + -1.25)
+    return TranslateVector(chassis, self.currentRotation, -#(chassis - bottomFront) + offset)
 end
 
 function Inspector:GetRearOfVehicle()
@@ -715,8 +783,9 @@ function Inspector:GetRearOfVehicle()
     local bottomFront = GetCentreOfVectors(bounds[1], bounds[2])
     local chassis = GetWorldPositionOfEntityBone(self.vehicle, GetEntityBoneIndexByName(self.vehicle, 'chassis_dummy'))
     chassis = vector3(chassis.x, chassis.y, center.z)
+    local offset = self.vehicleType == 8 and 0.6 or 1.25
 
-    return TranslateVector(chassis, self.currentRotation, #(chassis - bottomFront) + 1.25)   
+    return TranslateVector(chassis, self.currentRotation, #(chassis - bottomFront) + offset)   
 end
 
 function Inspector:GetSideOfVehicle()
@@ -724,8 +793,9 @@ function Inspector:GetSideOfVehicle()
     local topFront = GetCentreOfVectors(bounds[6], bounds[7])
     local bottomFront = GetCentreOfVectors(bounds[1], bounds[4])
     local center = GetCentreOfVectors(topFront, bottomFront)
+    local offset = self.vehicleType == 8 and 1.75 or 3.25
 
-    return TranslateVector(center, self.currentRotation - 90, 3.25)
+    return TranslateVector(center, self.currentRotation - 90, offset)
 end
 
 function Inspector:SetButtonMessage(text)
