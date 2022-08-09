@@ -27,6 +27,7 @@ client_scripts {
     coords = vector4(-791.61, -217.96, 36.40, 90.00), -- the spawn coords
     hasRearEngine = true, -- whether the vehicle is rear / mid-engined
     engineCompartmentIndex = 5, -- engine compartment doorIndex
+    putInVehicle = false, -- whether to put the player in the vehicle or spawn a clone (required for cockpit view)
     easeIn = false, -- whether to smoothly transition to the inspector camera
     easeOut = false, -- whether to smoothly transition back to the player camera
     revolve = true, -- whether to set the vehicle as revolving when entering inspector
@@ -88,5 +89,5 @@ If the vehicle's engine compartment doesn't function then the instance will auto
 - [ ] Allow controls to be customised
 - [ ] Allow setting of vehicle attributes / mods
 - [ ] Allow custom offsets / rotations for cameras
-- [ ] Fix camera distance when motorcycles are used
+- [x] Fix camera distance when motorcycles are used
 - [x] Some custom vehicles are badly made and the bounding boxes are off center which can cause the front / rear cameras to be misaligned - need to find a way of fixing this. Possibly use bones for alignment.
